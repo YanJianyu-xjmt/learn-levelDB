@@ -5,7 +5,6 @@
   在db.h 文件中定义了虚基类
 
 ```
-```
 include <stdint.h>
 #include <stdio.h>
 #include "leveldb/iterator.h"
@@ -19,69 +18,68 @@ class WriteBatch；
 // 快照是不可变的对象，
 // 因此可以从多个线程安全地访问，而无需任何外部同步。
 class Snapshot {
- protected:
-  virtual ~Snapshot();
+ protected:
+ virtual ~Snapshot();
 };
 // key的范围 前闭后开区间
 // A range of keys
 struct Range {
-  Slice start;          // Included in the range
-  Slice limit;          // Not included in the range
-  Range() { }
-  Range(const Slice& s, const Slice& l) : start(s), limit(l) { }
+ Slice start;          // Included in the range
+ Slice limit;          // Not included in the range
+ Range() { }
+ Range(const Slice& s, const Slice& l) : start(s), limit(l) { }
 };
 // DB是一个持久存储的 map 
 // DB是一个线程安全的，不需要额外的同步
 class DB {
- public:
+ public:
 // 用特定的name打开数据库
 // 用一个堆变量（存储在堆上的变量？）指针并返回
 // 成功是返回OK
 // 如果失败 返回null 和空指针 
 // 调用者会应当删除dbptr 如果不再需要
-  static Status Open(const Options& options,
-                     const std::string& name,
-                     DB** dbptr);
+ static Status Open(const Options& options,
+ const std::string& name,
+ DB** dbptr);
 
-  DB() { }
-  virtual ~DB();
+ DB() { }
+ virtual ~DB();
 // Note:考虑设置 option.sync = ture
-  virtual Status Put(const WriteOptions& options,
-                     const Slice& key,
-                     const Slice& value) = 0;
+ virtual Status Put(const WriteOptions& options,
+ const Slice& key,
+ const Slice& value) = 0;
 // 删除entry 
-// 如果成功 ok  如果不成功 存在error 如果有问题 返回error
+// 如果成功 ok 如果不成功 存在error 如果有问题 返回error
 // note： 考虑设置option.sync = true
-  virtual Status Delete(const WriteOptions& options, const Slice& key) = 0;
-  // 设置数据库的更新的
-  // 成功返回陈工，不ok 失败 
-  // 考虑: 设置options.sync = true
-  virtual Status Write(const WriteOptions& options, WriteBatch* updates) = 0;
-  // 如果找得到 会放到指针那里 并且返回status ok 如果没有会返回 status isnotfound
-  // 也许会返回错误
-  virtual Status Get(const ReadOptions& options,
-                     const Slice& key, std::string* value) = 0;
-  virtual Iterator* NewIterator(const ReadOptions& options) = 0;
-  virtual const Snapshot* GetSnapshot() = 0;
-// 释放以前的快照可以获取快照  这个caller 调用之后 后面的就没有用了
-  virtual void ReleaseSnapshot(const Snapshot* snapshot) = 0;
-  virtual bool GetProperty(const Slice& property, std::string* value) = 0;
-  virtual void GetApproximateSizes(const Range* range, int n,
-                                   uint64_t* sizes) = 0;
+ virtual Status Delete(const WriteOptions& options, const Slice& key) = 0;
+ // 设置数据库的更新的
+ // 成功返回陈工，不ok 失败 
+ // 考虑: 设置options.sync = true
+ virtual Status Write(const WriteOptions& options, WriteBatch* updates) = 0;
+ // 如果找得到 会放到指针那里 并且返回status ok 如果没有会返回 status isnotfound
+ // 也许会返回错误
+ virtual Status Get(const ReadOptions& options,
+ const Slice& key, std::string* value) = 0;
+ virtual Iterator* NewIterator(const ReadOptions& options) = 0;
+ virtual const Snapshot* GetSnapshot() = 0;
+// 释放以前的快照可以获取快照 这个caller 调用之后 后面的就没有用了
+ virtual void ReleaseSnapshot(const Snapshot* snapshot) = 0;
+ virtual bool GetProperty(const Slice& property, std::string* value) = 0;
+ virtual void GetApproximateSizes(const Range* range, int n,
+ uint64_t* sizes) = 0;
 // 压缩key range存储
 // 如果需要删除已经被写入的
-  virtual void CompactRange(const Slice* begin, const Slice* end) = 0;
- private:
-  // No copying allowed
-  DB(const DB&);
-  void operator=(const DB&);
+ virtual void CompactRange(const Slice* begin, const Slice* end) = 0;
+ private:
+ // No copying allowed
+ DB(const DB&);
+ void operator=(const DB&);
 };
-// 摧毁特定的数据库    小心使用
+// 摧毁特定的数据库 小心使用
 Status DestroyDB(const std::string& name, const Options& options);
-// 如果DB 没有被打开   也许需要调用这个命令  重建数据库
+// 如果DB 没有被打开 也许需要调用这个命令 重建数据库
 Status RepairDB(const std::string& dbname, const Options& options);
 }  // namespace leveld
-```
 ```
 
 ## 2 具体实现
