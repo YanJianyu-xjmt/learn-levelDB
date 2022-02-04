@@ -103,117 +103,117 @@
     - 然后读取table cache
   
   - 如果查找sst文件，且sst的文件allowed_seek <= 0 可能触发compaction 。这个allowed-seek会被查一次减少一次。
-    
+
     // 从sst读取kv
     Status Version::Get(const ReadOptions& options,
-                        const LookupKey& k,
-                        std::string* value,
-                        GetStats* stats) {
-      // ikjey internal-key
-      Slice ikey = k.internal_key();
-      Slice user_key = k.user_key();
-      // vset 
-      const Comparator* ucmp = vset_->icmp_.user_comparator();
-      Status s;
+     const LookupKey& k,
+     std::string* value,
+     GetStats* stats) {
+     // ikjey internal-key
+     Slice ikey = k.internal_key();
+     Slice user_key = k.user_key();
+     // vset 
+     const Comparator* ucmp = vset_->icmp_.user_comparator();
+     Status s;
     
-      stats->seek_file = NULL;
-      stats->seek_file_level = -1;
-      FileMetaData* last_file_read = NULL;
-      int last_file_read_level = -1;
+     stats->seek_file = NULL;
+     stats->seek_file_level = -1;
+     FileMetaData* last_file_read = NULL;
+     int last_file_read_level = -1;
     
-      // We can search level-by-level since entries never hop across
-      // levels.  Therefore we are guaranteed that if we find data
-      // in an smaller level, later levels are irrelevant.
-      // 我们能够一层一层的搜索 因为条目永远不会跨级别 
-      // 因此可以保证 如果在比较 小的级别上找到数据 后面的级别就无关紧要了
-      std::vector<FileMetaData*> tmp;
-      FileMetaData* tmp2;
-      // 每一个level都会查找一下
-      for (int level = 0; level < config::kNumLevels; level++) {
+     // We can search level-by-level since entries never hop across
+     // levels.  Therefore we are guaranteed that if we find data
+     // in an smaller level, later levels are irrelevant.
+     // 我们能够一层一层的搜索 因为条目永远不会跨级别 
+     // 因此可以保证 如果在比较 小的级别上找到数据 后面的级别就无关紧要了
+     std::vector<FileMetaData*> tmp;
+     FileMetaData* tmp2;
+     // 每一个level都会查找一下
+     for (int level = 0; level < config::kNumLevels; level++) {
     
-        size_t num_files = files_[level].size();
-        if (num_files == 0) continue;
+     size_t num_files = files_[level].size();
+     if (num_files == 0) continue;
     
-        // Get the list of files to search in this level
-        FileMetaData* const* files = &files_[level][0];
-        // level 0查 除了level0 其他的都是没有重叠且有序的
-        if (level == 0) {
-          // level-0 文件也许存在重叠  找到所有重叠的user -key 并从新到旧的顺序查找重叠user key
-          // Level-0 files may overlap each other.  Find all files that
-          // overlap user_key and process them in order from newest to oldest.
-          tmp.reserve(num_files);
-          // 临时变量存 所有有可能的的文件
-          for (uint32_t i = 0; i < num_files; i++) {
-            FileMetaData* f = files[i];
-            if (ucmp->Compare(user_key, f->smallest.user_key()) >= 0 &&
-                ucmp->Compare(user_key, f->largest.user_key()) <= 0) {
-              tmp.push_back(f);
-            }
-          }
-          if (tmp.empty()) continue;
-          // 根据版本从新到老排列
-          std::sort(tmp.begin(), tmp.end(), NewestFirst);
-          files = &tmp[0];
-          // 有多少个file
-          num_files = tmp.size();
-        } else {
-          // Binary search to find earliest index whose largest key >= ikey.
-          // 二分查找查找 看最早且最大key 大于ikey的结果
-          uint32_t index = FindFile(vset_->icmp_, files_[level], ikey);
-          // 就是比整个level中最大的key都大
-          if (index >= num_files) {
-            files = NULL;
-            num_files = 0;
-          } else {
-            // 是否比整个level中最小的key都小
-            tmp2 = files[index];
-            if (ucmp->Compare(user_key, tmp2->smallest.user_key()) < 0) {
-              // All of "tmp2" is past any data for user_key
-              files = NULL;
-              num_files = 0;
-            } else {
-              files = &tmp2;
-              num_files = 1;
-            }
-          }
-        }
+     // Get the list of files to search in this level
+     FileMetaData* const* files = &files_[level][0];
+     // level 0查 除了level0 其他的都是没有重叠且有序的
+     if (level == 0) {
+     // level-0 文件也许存在重叠  找到所有重叠的user -key 并从新到旧的顺序查找重叠user key
+     // Level-0 files may overlap each other.  Find all files that
+     // overlap user_key and process them in order from newest to oldest.
+     tmp.reserve(num_files);
+     // 临时变量存 所有有可能的的文件
+     for (uint32_t i = 0; i < num_files; i++) {
+     FileMetaData* f = files[i];
+     if (ucmp->Compare(user_key, f->smallest.user_key()) >= 0 &&
+     ucmp->Compare(user_key, f->largest.user_key()) <= 0) {
+     tmp.push_back(f);
+     }
+     }
+     if (tmp.empty()) continue;
+     // 根据版本从新到老排列
+     std::sort(tmp.begin(), tmp.end(), NewestFirst);
+     files = &tmp[0];
+     // 有多少个file
+     num_files = tmp.size();
+     } else {
+     // Binary search to find earliest index whose largest key >= ikey.
+     // 二分查找查找 看最早且最大key 大于ikey的结果
+     uint32_t index = FindFile(vset_->icmp_, files_[level], ikey);
+     // 就是比整个level中最大的key都大
+     if (index >= num_files) {
+     files = NULL;
+     num_files = 0;
+     } else {
+     // 是否比整个level中最小的key都小
+     tmp2 = files[index];
+     if (ucmp->Compare(user_key, tmp2->smallest.user_key()) < 0) {
+     // All of "tmp2" is past any data for user_key
+     files = NULL;
+     num_files = 0;
+     } else {
+     files = &tmp2;
+     num_files = 1;
+     }
+     }
+     }
     
-        for (uint32_t i = 0; i < num_files; ++i) {
-          if (last_file_read != NULL && stats->seek_file == NULL) {
-            // We have had more than one seek for this read.  Charge the 1st file.
-            stats->seek_file = last_file_read;
-            stats->seek_file_level = last_file_read_level;
-          }
+     for (uint32_t i = 0; i < num_files; ++i) {
+     if (last_file_read != NULL && stats->seek_file == NULL) {
+     // We have had more than one seek for this read.  Charge the 1st file.
+     stats->seek_file = last_file_read;
+     stats->seek_file_level = last_file_read_level;
+     }
     
-          FileMetaData* f = files[i];
-          last_file_read = f;
-          last_file_read_level = level;
+     FileMetaData* f = files[i];
+     last_file_read = f;
+     last_file_read_level = level;
     
-          Saver saver;
-          saver.state = kNotFound;
-          saver.ucmp = ucmp;
-          saver.user_key = user_key;
-          saver.value = value;
-          // 先找table cache 
-          s = vset_->table_cache_->Get(options, f->number, f->file_size,
-                                       ikey, &saver, SaveValue);
-          if (!s.ok()) {
-            return s;
-          }
-          switch (saver.state) {
-            case kNotFound:
-              break;      // Keep searching in other files
-            case kFound:
-              return s;
-            case kDeleted:
-              s = Status::NotFound(Slice());  // Use empty error message for speed
-              return s;
-            case kCorrupt:
-              s = Status::Corruption("corrupted key for ", user_key);
-              return s;
-          }
-        }
-      }
+     Saver saver;
+     saver.state = kNotFound;
+     saver.ucmp = ucmp;
+     saver.user_key = user_key;
+     saver.value = value;
+     // 先找table cache 
+     s = vset_->table_cache_->Get(options, f->number, f->file_size,
+     ikey, &saver, SaveValue);
+     if (!s.ok()) {
+     return s;
+     }
+     switch (saver.state) {
+     case kNotFound:
+     break;      // Keep searching in other files
+     case kFound:
+     return s;
+     case kDeleted:
+     s = Status::NotFound(Slice());  // Use empty error message for speed
+     return s;
+     case kCorrupt:
+     s = Status::Corruption("corrupted key for ", user_key);
+     return s;
+     }
+     }
+     }
     
-      return Status::NotFound(Slice());  // Use an empty error message for speed
+     return Status::NotFound(Slice());  // Use an empty error message for speed
     }
